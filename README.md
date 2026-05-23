@@ -74,3 +74,8 @@ PIOA-M6O-107BV-25/
 python -m src.db - In-Memory (по умолчанию)
 python -m src.db json - Файловая JSON
 python -m src.db csv - Файловая CSV
+
+# Запуск тестов
+python -m coverage run -m unittest discover -s tests
+python -m coverage report - Процент покрытмя
+
