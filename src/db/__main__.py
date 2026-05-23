@@ -2,9 +2,14 @@ import sys
 from .tui import DatabaseTUI
 
 if __name__ == "__main__":
-    storage = "memory"
+    db_type = "memory"
     if len(sys.argv) > 1:
-        if sys.argv[1] in ("file", "memory"):
-            storage = sys.argv[1]
-    app = DatabaseTUI(storage_type=storage)
+        db_type = sys.argv[1]
+    
+    if db_type not in ["memory", "json", "csv"]:
+        print("Ошибка: неверный тип базы данных.")
+        print("Доступные варианты: memory, json, csv")
+        sys.exit(1)
+    
+    app = DatabaseTUI(db_type)
     app.run()

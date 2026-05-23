@@ -1,23 +1,24 @@
 from .database import Database
 from .table import Table
-from .errors import TableNotFoundError
+from .errors import TableNotFoundError, TableAlreadyExistsError
 
-class MemoryDatabase(Database):
+
+class InMemoryDB(Database):
     def __init__(self):
-        self._tables = {}
+        self.tables = {}
 
     def create_table(self, name, columns):
-        if name in self._tables:
-            raise ValueError(f"Таблица '{name}' уже существует")
-        self._tables[name] = Table(name, columns)
+        if name in self.tables:
+            raise TableAlreadyExistsError(f"Таблица '{name}' уже существует")
+        self.tables[name] = Table(name, columns)
 
     def get_table(self, name):
-        if name not in self._tables:
+        if name not in self.tables:
             raise TableNotFoundError(f"Таблица '{name}' не найдена")
-        return self._tables[name]
+        return self.tables[name]
 
     def list_tables(self):
-        return list(self._tables.keys())
+        return list(self.tables.keys())
 
     def save(self):
         pass
