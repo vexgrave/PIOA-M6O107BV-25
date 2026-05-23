@@ -1,0 +1,10 @@
+{
+  "students": {
+    "columns": [
+      "name",
+      "age",
+      "group"
+    ],
+    "next_id": 3
+  }
+}

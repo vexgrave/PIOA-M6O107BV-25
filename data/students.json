@@ -1,0 +1,24 @@
+{
+  "name": "students",
+  "columns": [
+    "name",
+    "age",
+    "group"
+  ],
+  "rows": [
+    {
+      "name": "pavel",
+      "age": 18,
+      "group": 107,
+      "id": 1
+    },
+    {
+      "name": "renat",
+      "age": 18,
+      "group": 106,
+      "id": 2
+    }
+  ],
+  "next_id": 3,
+  "indexes": {}
+}
