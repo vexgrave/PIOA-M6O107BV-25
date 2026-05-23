@@ -1,8 +1,22 @@
-class StudentTableError(Exception):
+class DatabaseError(Exception):
     pass
 
-class InvalidAgeError(StudentTableError):
+
+class TableNotFoundError(DatabaseError):
     pass
 
-class DuplicateIDError(StudentTableError):
+
+class TableAlreadyExistsError(DatabaseError):
+    pass
+
+
+class FieldNotFoundError(DatabaseError):
+    pass
+
+
+class RecordNotFoundError(DatabaseError):
+    pass
+
+
+class MissingFieldError(DatabaseError):
     pass

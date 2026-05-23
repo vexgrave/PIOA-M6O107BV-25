@@ -1,72 +1,84 @@
-from .errors import InvalidAgeError, DuplicateIDError
+from .errors import (
+    TableNotFoundError,
+    TableAlreadyExistsError,
+    FieldNotFoundError,
+    RecordNotFoundError,
+    MissingFieldError,
+)
 
 
-class StudentTable:
-    def __init__(self):
-        self._records = {}
-        self._next_id = 1
+class Table:
+    def __init__(self, name, columns):
+        self.name = name
+        self.columns = columns
+        self.rows = []
+        self.next_id = 1
 
-    def create_record(self, first_name, second_name, age, sex):
-        if age < 0:
-            raise InvalidAgeError("Возраст не может быть отрицательным")
-        
-        record_id = self._next_id
-        record = (record_id, first_name, second_name, age, sex)
-        self._records[record_id] = record
-        self._next_id += 1
-        return record_id
+    def add(self, data):
+        for col in self.columns:
+            if col not in data:
+                raise MissingFieldError(f"Отсутствует поле: {col}")
+        data["id"] = self.next_id
+        self.rows.append(data)
+        self.next_id += 1
+        return data["id"]
 
-    def select_record(self, record_id):
-        if record_id not in self._records:
-            raise KeyError(f"Запись с ID {record_id} не найдена")
-        return self._records[record_id]
-
-    def select_all(self):
-        return list(self._records.values())
-
-    def select_by_filter(self, field_name, value):
-        fields = ["id", "first_name", "second_name", "age", "sex"]
-        if field_name not in fields:
-            raise ValueError(f"Поле '{field_name}' не найдено")
-        
-        field_index = fields.index(field_name)
+    def read(self, filters=None):
+        if filters is None:
+            return self.rows[:]
         result = []
-        for record in self._records.values():
-            if str(record[field_index]) == str(value):
-                result.append(record)
+        for row in self.rows:
+            match = True
+            for key, value in filters.items():
+                if key not in self.columns and key != "id":
+                    raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
+                if str(row.get(key)) != str(value):
+                    match = False
+                    break
+            if match:
+                result.append(row)
         return result
 
-    def update_record(self, record_id, first_name=None, second_name=None, age=None, sex=None):
-        if record_id not in self._records:
-            raise KeyError(f"Запись с ID {record_id} не найдена")
-        
-        old_record = self._records[record_id]
-        new_record = (
-            record_id,
-            first_name if first_name is not None else old_record[1],
-            second_name if second_name is not None else old_record[2],
-            age if age is not None else old_record[3],
-            sex if sex is not None else old_record[4]
+    def update(self, row_id, new_data):
+        for row in self.rows:
+            if row["id"] == row_id:
+                for k, v in new_data.items():
+                    if k in self.columns:
+                        row[k] = v
+                return True
+        return False
+
+    def delete(self, row_id):
+        for i, row in enumerate(self.rows):
+            if row["id"] == row_id:
+                self.rows.pop(i)
+                return True
+        return False
+
+    def sort(self, field, reverse=False):
+        if field not in self.columns and field != "id":
+            raise FieldNotFoundError(f"Поле '{field}' не найдено в таблице")
+        self.rows = sorted(
+            self.rows,
+            key=lambda row: row.get(field, ""),
+            reverse=reverse
         )
-        
-        if new_record[3] < 0:
-            raise InvalidAgeError("Возраст не может быть отрицательным")
-        
-        self._records[record_id] = new_record
-        return True
+        return self.rows[:]
 
-    def delete_record(self, record_id):
-        if record_id not in self._records:
-            raise KeyError(f"Запись с ID {record_id} не найдена")
-        del self._records[record_id]
-        return True
 
-    def sort_records(self, field_name, ascending=True):
-        fields = ["id", "first_name", "second_name", "age", "sex"]
-        if field_name not in fields:
-            raise ValueError(f"Поле '{field_name}' не найдено")
-        
-        field_index = fields.index(field_name)
-        records = list(self._records.values())
-        records.sort(key=lambda x: x[field_index], reverse=not ascending)
-        return records
+class InMemoryDB:
+    def __init__(self):
+        self.tables = {}
+
+    def create_table(self, name, columns):
+        if name in self.tables:
+            raise TableAlreadyExistsError(f"Таблица '{name}' уже существует")
+        self.tables[name] = Table(name, columns)
+
+    def get_table(self, name):
+        if name not in self.tables:
+            raise TableNotFoundError(f"Таблица '{name}' не найдена")
+        return self.tables[name]
+
+    def list_tables(self):
+        return list(self.tables.keys())

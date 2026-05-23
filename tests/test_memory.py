@@ -1,152 +1,136 @@
 import unittest
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from src.db.backend.memory import Table, InMemoryDB
+from src.db.backend.errors import (
+    TableNotFoundError,
+    TableAlreadyExistsError,
+    FieldNotFoundError,
+    MissingFieldError,
+)
 
-from src.db.backend.memory import StudentTable
-from src.db.backend.errors import InvalidAgeError, DuplicateIDError, StudentTableError
 
+class TestTable(unittest.TestCase):
 
-class TestStudentTableCreate(unittest.TestCase):
     def setUp(self):
-        self.table = StudentTable()
+        self.table = Table("users", ["name", "age"])
 
-    def test_create_record_success(self):
-        record_id = self.table.create_record("Иван", "Иванов", 20, "М")
+    def test_add_record(self):
+        record_id = self.table.add({"name": "Anna", "age": 20})
         self.assertEqual(record_id, 1)
+        self.assertEqual(len(self.table.rows), 1)
+        self.assertEqual(self.table.rows[0]["name"], "Anna")
 
-    def test_create_multiple_records(self):
-        id1 = self.table.create_record("Иван", "Иванов", 20, "М")
-        id2 = self.table.create_record("Петр", "Петров", 21, "М")
-        self.assertEqual(id1, 1)
-        self.assertEqual(id2, 2)
+    def test_add_missing_field(self):
+        with self.assertRaises(MissingFieldError):
+            self.table.add({"name": "Bob"})
 
-    def test_create_record_invalid_age(self):
-        with self.assertRaises(InvalidAgeError):
-            self.table.create_record("Иван", "Иванов", -5, "М")
+    def test_read_all(self):
+        self.table.add({"name": "Anna", "age": 20})
+        self.table.add({"name": "Bob", "age": 25})
+        result = self.table.read()
+        self.assertEqual(len(result), 2)
 
+    def test_read_with_filter(self):
+        self.table.add({"name": "Anna", "age": 20})
+        self.table.add({"name": "Bob", "age": 25})
+        result = self.table.read({"age": "20"})
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "Anna")
 
-class TestStudentTableSelect(unittest.TestCase):
-    def setUp(self):
-        self.table = StudentTable()
-        self.table.create_record("Иван", "Иванов", 20, "М")
-        self.table.create_record("Петр", "Петров", 21, "Ж")
+    def test_read_invalid_field(self):
+        with self.assertRaises(FieldNotFoundError):
+            self.table.read({"invalid_field": "value"})
 
-    def test_select_record_by_id(self):
-        record = self.table.select_record(1)
-        self.assertEqual(record[1], "Иван")
-        self.assertEqual(record[2], "Иванов")
-        self.assertEqual(record[3], 20)
+    def test_update_existing(self):
+        record_id = self.table.add({"name": "Anna", "age": 20})
+        self.table.update(record_id, {"age": 21})
+        updated = self.table.read({"id": record_id})
+        self.assertEqual(updated[0]["age"], 21)
 
-    def test_select_record_not_found(self):
-        with self.assertRaises(KeyError):
-            self.table.select_record(999)
+    def test_update_nonexistent(self):
+        result = self.table.update(999, {"name": "Test"})
+        self.assertFalse(result)
 
-    def test_select_all(self):
-        records = self.table.select_all()
-        self.assertEqual(len(records), 2)
-
-    def test_select_by_filter_first_name(self):
-        results = self.table.select_by_filter("first_name", "Иван")
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0][1], "Иван")
-
-    def test_select_by_filter_age(self):
-        results = self.table.select_by_filter("age", 21)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0][2], "Петров")
-
-    def test_select_by_filter_invalid_field(self):
-        with self.assertRaises(ValueError):
-            self.table.select_by_filter("invalid_field", "value")
-
-
-class TestStudentTableUpdate(unittest.TestCase):
-    def setUp(self):
-        self.table = StudentTable()
-        self.table.create_record("Иван", "Иванов", 20, "М")
-
-    def test_update_record_success(self):
-        result = self.table.update_record(1, first_name="Петр")
+    def test_delete_existing(self):
+        record_id = self.table.add({"name": "Anna", "age": 20})
+        result = self.table.delete(record_id)
         self.assertTrue(result)
-        record = self.table.select_record(1)
-        self.assertEqual(record[1], "Петр")
+        self.assertEqual(len(self.table.rows), 0)
 
-    def test_update_record_partial(self):
-        self.table.update_record(1, age=25)
-        record = self.table.select_record(1)
-        self.assertEqual(record[3], 25)
-        self.assertEqual(record[1], "Иван")
+    def test_delete_nonexistent(self):
+        result = self.table.delete(999)
+        self.assertFalse(result)
 
-    def test_update_record_not_found(self):
-        with self.assertRaises(KeyError):
-            self.table.update_record(999, first_name="Test")
+    def test_sort_ascending(self):
+        self.table.add({"name": "Bob", "age": 25})
+        self.table.add({"name": "Anna", "age": 20})
+        self.table.add({"name": "Charlie", "age": 30})
+        sorted_rows = self.table.sort("age", reverse=False)
+        self.assertEqual(sorted_rows[0]["name"], "Anna")
+        self.assertEqual(sorted_rows[1]["name"], "Bob")
+        self.assertEqual(sorted_rows[2]["name"], "Charlie")
 
-    def test_update_record_invalid_age(self):
-        with self.assertRaises(InvalidAgeError):
-            self.table.update_record(1, age=-10)
-
-
-class TestStudentTableDelete(unittest.TestCase):
-    def setUp(self):
-        self.table = StudentTable()
-        self.table.create_record("Иван", "Иванов", 20, "М")
-
-    def test_delete_record_success(self):
-        result = self.table.delete_record(1)
-        self.assertTrue(result)
-        with self.assertRaises(KeyError):
-            self.table.select_record(1)
-
-    def test_delete_record_not_found(self):
-        with self.assertRaises(KeyError):
-            self.table.delete_record(999)
-
-
-class TestStudentTableSort(unittest.TestCase):
-    def setUp(self):
-        self.table = StudentTable()
-        self.table.create_record("Иван", "Иванов", 25, "М")
-        self.table.create_record("Петр", "Петров", 20, "Ж")
-        self.table.create_record("Анна", "Сидорова", 30, "Ж")
-
-    def test_sort_by_age_ascending(self):
-        sorted_records = self.table.sort_records("age", ascending=True)
-        self.assertEqual(sorted_records[0][3], 20)
-        self.assertEqual(sorted_records[2][3], 30)
-
-    def test_sort_by_age_descending(self):
-        sorted_records = self.table.sort_records("age", ascending=False)
-        self.assertEqual(sorted_records[0][3], 30)
-        self.assertEqual(sorted_records[2][3], 20)
-
-    def test_sort_by_first_name(self):
-        sorted_records = self.table.sort_records("first_name", ascending=True)
-        self.assertEqual(sorted_records[0][1], "Анна")
+    def test_sort_descending(self):
+        self.table.add({"name": "Bob", "age": 25})
+        self.table.add({"name": "Anna", "age": 20})
+        self.table.add({"name": "Charlie", "age": 30})
+        sorted_rows = self.table.sort("age", reverse=True)
+        self.assertEqual(sorted_rows[0]["name"], "Charlie")
+        self.assertEqual(sorted_rows[1]["name"], "Bob")
+        self.assertEqual(sorted_rows[2]["name"], "Anna")
 
     def test_sort_invalid_field(self):
-        with self.assertRaises(ValueError):
-            self.table.sort_records("invalid", True)
+        with self.assertRaises(FieldNotFoundError):
+            self.table.sort("invalid_field")
 
 
-class TestStudentTableEdgeCases(unittest.TestCase):
+class TestInMemoryDB(unittest.TestCase):
+
     def setUp(self):
-        self.table = StudentTable()
+        self.db = InMemoryDB()
 
-    def test_empty_table_select_all(self):
-        records = self.table.select_all()
-        self.assertEqual(len(records), 0)
+    def test_create_table(self):
+        self.db.create_table("users", ["name", "age"])
+        tables = self.db.list_tables()
+        self.assertIn("users", tables)
 
-    def test_empty_table_sort(self):
-        sorted_records = self.table.sort_records("age")
-        self.assertEqual(len(sorted_records), 0)
+    def test_create_duplicate_table(self):
+        self.db.create_table("users", ["name", "age"])
+        with self.assertRaises(TableAlreadyExistsError):
+            self.db.create_table("users", ["name", "age"])
 
-    def test_create_record_empty_strings(self):
-        record_id = self.table.create_record("", "", 0, "")
-        self.assertEqual(record_id, 1)
-        record = self.table.select_record(1)
-        self.assertEqual(record[1], "")
-        self.assertEqual(record[3], 0)
+    def test_get_table(self):
+        self.db.create_table("users", ["name", "age"])
+        table = self.db.get_table("users")
+        self.assertEqual(table.name, "users")
+
+    def test_get_nonexistent_table(self):
+        with self.assertRaises(TableNotFoundError):
+            self.db.get_table("users")
+
+    def test_list_tables(self):
+        self.db.create_table("users", ["name", "age"])
+        self.db.create_table("products", ["title", "price"])
+        tables = self.db.list_tables()
+        self.assertEqual(len(tables), 2)
+        self.assertIn("users", tables)
+        self.assertIn("products", tables)
+
+    def test_full_crud(self):
+        self.db.create_table("users", ["name", "age"])
+        table = self.db.get_table("users")
+        id1 = table.add({"name": "Anna", "age": 20})
+        id2 = table.add({"name": "Bob", "age": 25})
+        self.assertEqual(id1, 1)
+        self.assertEqual(id2, 2)
+        all_records = table.read()
+        self.assertEqual(len(all_records), 2)
+        filtered = table.read({"age": "20"})
+        self.assertEqual(len(filtered), 1)
+        table.update(id1, {"age": 21})
+        updated = table.read({"id": id1})
+        self.assertEqual(updated[0]["age"], 21)
+        table.delete(id2)
+        self.assertEqual(len(table.read()), 1)
 
 
 if __name__ == "__main__":
