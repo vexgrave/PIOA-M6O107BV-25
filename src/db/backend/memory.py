@@ -63,3 +63,4 @@ class InMemoryDB:
 
     def list_tables(self):
         return list(self.tables.keys())
+
