@@ -58,3 +58,8 @@ desktop.ini
 
 # Logs
 *.log
+
+# Temp
+data/*.json
+data/*.csv
+
