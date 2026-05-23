@@ -1,160 +1,153 @@
 import unittest
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from src.db.backend.memory import StudentTable
-from src.db.backend.errors import InvalidAgeError, DuplicateIDError
+from src.db.backend.errors import InvalidAgeError, DuplicateIDError, StudentTableError
 
-class TestMemory(unittest.TestCase):
+
+class TestStudentTableCreate(unittest.TestCase):
     def setUp(self):
-        self.student_table = StudentTable()
+        self.table = StudentTable()
 
-    def test_student_table_allocation(self):
-        self.assertIsInstance(self.student_table, StudentTable)
+    def test_create_record_success(self):
+        record_id = self.table.create_record("Иван", "Иванов", 20, "М")
+        self.assertEqual(record_id, 1)
 
-    def test_create_record(self):
-        cases = [
-            (1, "John", "Doe", 20, "M"),
-            (2, "Jane", "Smith", 22, "F"),
-            (3, "Alice", "Johnson", 19, "F"),
-            (4, "Bob", "Brown", 21, "M"),
-            (5, "Charlie", "Davis", 18, "M"),
-            (6, "Eve", "Miller", 23, "F"),
-            (7, "Frank", "Wilson", 20, "M"),
-            (8, "Grace", "Moore", 22, "F"),
-            (9, "Hank", "Taylor", 19, "M"),
-            (10, "Ivy", "Anderson", 21, "F"),
-            (11, "Jack", "Thomas", 18, "M"),
-            (12, "Kathy", "Jackson", 23, "F"),
-        ]
+    def test_create_multiple_records(self):
+        id1 = self.table.create_record("Иван", "Иванов", 20, "М")
+        id2 = self.table.create_record("Петр", "Петров", 21, "М")
+        self.assertEqual(id1, 1)
+        self.assertEqual(id2, 2)
 
-        for test_data in cases:
-            with self.subTest(test_data=test_data):
-                record = self.student_table.create_record(*test_data)
-                self.assertEqual(record, test_data)
+    def test_create_record_invalid_age(self):
+        with self.assertRaises(InvalidAgeError):
+            self.table.create_record("Иван", "Иванов", -5, "М")
 
-    def test_create_record_negative_age(self):
-        cases = [
-            (1, "John", "Doe", -1, "M"),
-            (2, "Jane", "Smith", -5, "F"),
-            (3, "Alice", "Johnson", -10, "F"),
-        ]
-        error_message = "Поле age не может быть отрицательным."
 
-        for test_data in cases:
-            with self.subTest(test_data=test_data):
-                with self.assertRaises(InvalidAgeError) as context:
-                    self.student_table.create_record(*test_data)
-                self.assertEqual(str(context.exception), error_message)
+class TestStudentTableSelect(unittest.TestCase):
+    def setUp(self):
+        self.table = StudentTable()
+        self.table.create_record("Иван", "Иванов", 20, "М")
+        self.table.create_record("Петр", "Петров", 21, "Ж")
 
-    def test_create_record_duplicate_id(self):
-        test_data_1 = (1, "John", "Doe", 20, "M")
-        test_data_2 = (1, "Jane", "Smith", 22, "F")
-        error_message = "Запись с id=1 уже существует."
+    def test_select_record_by_id(self):
+        record = self.table.select_record(1)
+        self.assertEqual(record[1], "Иван")
+        self.assertEqual(record[2], "Иванов")
+        self.assertEqual(record[3], 20)
 
-        self.student_table.create_record(*test_data_1)
+    def test_select_record_not_found(self):
+        with self.assertRaises(KeyError):
+            self.table.select_record(999)
 
-        with self.assertRaises(DuplicateIDError) as context:
-            self.student_table.create_record(*test_data_2)
+    def test_select_all(self):
+        records = self.table.select_all()
+        self.assertEqual(len(records), 2)
 
-        self.assertEqual(str(context.exception), error_message)
+    def test_select_by_filter_first_name(self):
+        results = self.table.select_by_filter("first_name", "Иван")
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0][1], "Иван")
 
-    def test_select_record(self):
-        test_datas = [
-            (1, "John", "Doe", 20, "M"),
-            (2, "Jane", "Smith", 22, "F"),
-            (3, "Alice", "Johnson", 19, "F"),
-            (4, "Bob", "Brown", 21, "M"),
-            (5, "Charlie", "Davis", 18, "M"),
-            (6, "Eve", "Miller", 23, "F"),
-            (7, "Frank", "Wilson", 20, "M"),
-            (8, "Grace", "Moore", 22, "F"),
-            (9, "Hank", "Taylor", 19, "M"),
-            (10, "Ivy", "Anderson", 21, "F"),
-        ]
+    def test_select_by_filter_age(self):
+        results = self.table.select_by_filter("age", 21)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0][2], "Петров")
 
-        for test_data in test_datas:
-            self.student_table.create_record(*test_data)
-
-        cases = [
-            {
-                "name": "Выбор без фильтров",
-                "filters": {},
-                "expected": test_datas,
-            },
-            {
-                "name": "Фильтр по ID",
-                "filters": {"student_id": 1},
-                "expected": [test_datas[0]],
-            },
-            {
-                "name": "Фильтр по имени",
-                "filters": {"first_name": "Jane"},
-                "expected": [test_datas[1]],
-            },
-            {
-                "name": "Фильтр по фамилии",
-                "filters": {"second_name": "Johnson"},
-                "expected": [test_datas[2]],
-            },
-            {
-                "name": "Фильтр по возрасту",
-                "filters": {"age": 20},
-                "expected": [test_datas[0], test_datas[6]],
-            },
-            {
-                "name": "Фильтр по полу",
-                "filters": {"sex": "F"},
-                "expected": [
-                    test_datas[1],
-                    test_datas[2],
-                    test_datas[5],
-                    test_datas[7],
-                    test_datas[9],
-                ],
-            },
-        ]
-
-        for case in cases:
-            with self.subTest(
-                case=case["name"], filters=case["filters"], expected=case["expected"]
-            ):
-                records = self.student_table.select_record(**case["filters"])
-                self.assertEqual(records, case["expected"])
-
-    def test_sort_records_by_field(self):
-        test_datas = [
-            (3, "Alice", "Johnson", 19, "F"),
-            (1, "John", "Doe", 20, "M"),
-            (2, "Jane", "Smith", 22, "F"),
-        ]
-
-        for test_data in test_datas:
-            self.student_table.create_record(*test_data)
-
-        sorted_by_id = self.student_table.sort_records("student_id")
-        self.assertEqual(sorted_by_id[0][0], 1)
-        self.assertEqual(sorted_by_id[1][0], 2)
-        self.assertEqual(sorted_by_id[2][0], 3)
-
-        sorted_by_age_desc = self.student_table.sort_records("age", reverse=True)
-        self.assertEqual(sorted_by_age_desc[0][3], 22)
-        self.assertEqual(sorted_by_age_desc[1][3], 20)
-        self.assertEqual(sorted_by_age_desc[2][3], 19)
-
-        sorted_by_name = self.student_table.sort_records("first_name")
-        self.assertEqual(sorted_by_name[0][1], "Alice")
-        self.assertEqual(sorted_by_name[1][1], "Jane")
-        self.assertEqual(sorted_by_name[2][1], "John")
-
-    def test_sort_records_invalid_field(self):
+    def test_select_by_filter_invalid_field(self):
         with self.assertRaises(ValueError):
-            self.student_table.sort_records("invalid_field")
+            self.table.select_by_filter("invalid_field", "value")
 
-    def test_create_record_strips_whitespace(self):
-        record = self.student_table.create_record(1, "  John  ", "  Doe  ", 20, "  M  ")
-        self.assertEqual(record, (1, "John", "Doe", 20, "M"))
 
-    def test_select_record_returns_copy(self):
-        self.student_table.create_record(1, "John", "Doe", 20, "M")
-        result1 = self.student_table.select_record()
-        result2 = self.student_table.select_record()
-        self.assertIsNot(result1, result2)
-        self.assertEqual(result1, result2)
+class TestStudentTableUpdate(unittest.TestCase):
+    def setUp(self):
+        self.table = StudentTable()
+        self.table.create_record("Иван", "Иванов", 20, "М")
+
+    def test_update_record_success(self):
+        result = self.table.update_record(1, first_name="Петр")
+        self.assertTrue(result)
+        record = self.table.select_record(1)
+        self.assertEqual(record[1], "Петр")
+
+    def test_update_record_partial(self):
+        self.table.update_record(1, age=25)
+        record = self.table.select_record(1)
+        self.assertEqual(record[3], 25)
+        self.assertEqual(record[1], "Иван")
+
+    def test_update_record_not_found(self):
+        with self.assertRaises(KeyError):
+            self.table.update_record(999, first_name="Test")
+
+    def test_update_record_invalid_age(self):
+        with self.assertRaises(InvalidAgeError):
+            self.table.update_record(1, age=-10)
+
+
+class TestStudentTableDelete(unittest.TestCase):
+    def setUp(self):
+        self.table = StudentTable()
+        self.table.create_record("Иван", "Иванов", 20, "М")
+
+    def test_delete_record_success(self):
+        result = self.table.delete_record(1)
+        self.assertTrue(result)
+        with self.assertRaises(KeyError):
+            self.table.select_record(1)
+
+    def test_delete_record_not_found(self):
+        with self.assertRaises(KeyError):
+            self.table.delete_record(999)
+
+
+class TestStudentTableSort(unittest.TestCase):
+    def setUp(self):
+        self.table = StudentTable()
+        self.table.create_record("Иван", "Иванов", 25, "М")
+        self.table.create_record("Петр", "Петров", 20, "Ж")
+        self.table.create_record("Анна", "Сидорова", 30, "Ж")
+
+    def test_sort_by_age_ascending(self):
+        sorted_records = self.table.sort_records("age", ascending=True)
+        self.assertEqual(sorted_records[0][3], 20)
+        self.assertEqual(sorted_records[2][3], 30)
+
+    def test_sort_by_age_descending(self):
+        sorted_records = self.table.sort_records("age", ascending=False)
+        self.assertEqual(sorted_records[0][3], 30)
+        self.assertEqual(sorted_records[2][3], 20)
+
+    def test_sort_by_first_name(self):
+        sorted_records = self.table.sort_records("first_name", ascending=True)
+        self.assertEqual(sorted_records[0][1], "Анна")
+
+    def test_sort_invalid_field(self):
+        with self.assertRaises(ValueError):
+            self.table.sort_records("invalid", True)
+
+
+class TestStudentTableEdgeCases(unittest.TestCase):
+    def setUp(self):
+        self.table = StudentTable()
+
+    def test_empty_table_select_all(self):
+        records = self.table.select_all()
+        self.assertEqual(len(records), 0)
+
+    def test_empty_table_sort(self):
+        sorted_records = self.table.sort_records("age")
+        self.assertEqual(len(sorted_records), 0)
+
+    def test_create_record_empty_strings(self):
+        record_id = self.table.create_record("", "", 0, "")
+        self.assertEqual(record_id, 1)
+        record = self.table.select_record(1)
+        self.assertEqual(record[1], "")
+        self.assertEqual(record[3], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

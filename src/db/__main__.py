@@ -1,10 +1,5 @@
-from .backend.memory import StudentTable
-from .tui import TUI
-
-def main():
-    table = StudentTable()
-    tui = TUI(table)
-    tui.run()
+from .tui import DatabaseTUI
 
 if __name__ == "__main__":
-    main()
+    app = DatabaseTUI()
+    app.run()

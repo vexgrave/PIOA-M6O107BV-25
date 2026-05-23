@@ -1,81 +1,72 @@
-from .errors import DuplicateIDError, InvalidAgeError
+from .errors import InvalidAgeError, DuplicateIDError
 
-type StudentRecord = tuple[int, str, str, int, str]
 
 class StudentTable:
-    def __init__(self) -> None:
-        self._student: list[StudentRecord] = []
+    def __init__(self):
+        self._records = {}
+        self._next_id = 1
 
-    def create_record(
-        self,
-        student_id: int,
-        first_name: str,
-        second_name: str,
-        age: int,
-        sex: str,
-    ) -> StudentRecord:
+    def create_record(self, first_name, second_name, age, sex):
         if age < 0:
-            raise InvalidAgeError("Поле age не может быть отрицательным.")
+            raise InvalidAgeError("Возраст не может быть отрицательным")
+        
+        record_id = self._next_id
+        record = (record_id, first_name, second_name, age, sex)
+        self._records[record_id] = record
+        self._next_id += 1
+        return record_id
 
-        if any(record[0] == student_id for record in self._student):
-            raise DuplicateIDError(f"Запись с id={student_id} уже существует.")
+    def select_record(self, record_id):
+        if record_id not in self._records:
+            raise KeyError(f"Запись с ID {record_id} не найдена")
+        return self._records[record_id]
 
-        new_record: StudentRecord = (
-            student_id,
-            first_name.strip(),
-            second_name.strip(),
-            age,
-            sex.strip(),
-        )
-        self._student.append(new_record)
-        return new_record
+    def select_all(self):
+        return list(self._records.values())
 
-    def select_record(
-        self,
-        student_id: int | None = None,
-        first_name: str | None = None,
-        second_name: str | None = None,
-        age: int | None = None,
-        sex: str | None = None,
-    ) -> list[StudentRecord]:
-        if all(
-            param is None
-            for param in [student_id, first_name, second_name, age, sex]
-        ):
-            return self._student.copy()
-
-        result: list[StudentRecord] = []
-
-        for record in self._student:
-            if student_id is not None and record[0] != student_id:
-                continue
-            if first_name is not None and record[1] != first_name:
-                continue
-            if second_name is not None and record[2] != second_name:
-                continue
-            if age is not None and record[3] != age:
-                continue
-            if sex is not None and record[4] != sex:
-                continue
-            result.append(record)
-
+    def select_by_filter(self, field_name, value):
+        fields = ["id", "first_name", "second_name", "age", "sex"]
+        if field_name not in fields:
+            raise ValueError(f"Поле '{field_name}' не найдено")
+        
+        field_index = fields.index(field_name)
+        result = []
+        for record in self._records.values():
+            if str(record[field_index]) == str(value):
+                result.append(record)
         return result
 
-    def sort_records(
-        self,
-        field: str,
-        reverse: bool = False,
-    ) -> list[StudentRecord]:
-        field_index = {
-            "student_id": 0,
-            "first_name": 1,
-            "second_name": 2,
-            "age": 3,
-            "sex": 4,
-        }
+    def update_record(self, record_id, first_name=None, second_name=None, age=None, sex=None):
+        if record_id not in self._records:
+            raise KeyError(f"Запись с ID {record_id} не найдена")
+        
+        old_record = self._records[record_id]
+        new_record = (
+            record_id,
+            first_name if first_name is not None else old_record[1],
+            second_name if second_name is not None else old_record[2],
+            age if age is not None else old_record[3],
+            sex if sex is not None else old_record[4]
+        )
+        
+        if new_record[3] < 0:
+            raise InvalidAgeError("Возраст не может быть отрицательным")
+        
+        self._records[record_id] = new_record
+        return True
 
-        if field not in field_index:
-            raise ValueError(f"Недопустимое поле для сортировки: {field}")
+    def delete_record(self, record_id):
+        if record_id not in self._records:
+            raise KeyError(f"Запись с ID {record_id} не найдена")
+        del self._records[record_id]
+        return True
 
-        index = field_index[field]
-        return sorted(self._student, key=lambda x: x[index], reverse=reverse)
+    def sort_records(self, field_name, ascending=True):
+        fields = ["id", "first_name", "second_name", "age", "sex"]
+        if field_name not in fields:
+            raise ValueError(f"Поле '{field_name}' не найдено")
+        
+        field_index = fields.index(field_name)
+        records = list(self._records.values())
+        records.sort(key=lambda x: x[field_index], reverse=not ascending)
+        return records
