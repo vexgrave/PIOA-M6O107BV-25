@@ -1,78 +1,75 @@
-from .errors import MissingColumnError, UnknownColumnError, InvalidAgeError, DuplicateIDError
-
-type Record = tuple
+from .errors import InvalidAgeError, RecordNotFoundError
 
 class Table:
-    def __init__(self, name: str, columns: list[str]) -> None:
+    def __init__(self, name, columns):
         self.name = name
         self.columns = columns
-        self._records: list[Record] = []
-        self._indexes: dict[str, dict] = {}
+        self._records = {}
+        self._next_id = 1
 
-    def add_record(self, record: Record) -> None:
-        if len(record) != len(self.columns):
-            raise MissingColumnError("Количество значений не совпадает с количеством колонок")
-        self._records.append(record)
+    def create_record(self, data):
+        for col in self.columns:
+            if col not in data:
+                raise ValueError(f"Отсутствует поле: {col}")
+        if "age" in data and data["age"] < 0:
+            raise InvalidAgeError("Возраст не может быть отрицательным")
+        record_id = self._next_id
+        data["id"] = record_id
+        self._records[record_id] = data
+        self._next_id += 1
+        return record_id
 
-    def get_records(self) -> list[Record]:
-        return self._records.copy()
+    def select_record(self, record_id):
+        if record_id not in self._records:
+            raise RecordNotFoundError(f"Запись с ID {record_id} не найдена")
+        return self._records[record_id]
 
-    def select(
-        self,
-        filters: dict[str, any] | None = None,
-        order_by: str | None = None,
-        reverse: bool = False,
-    ) -> list[Record]:
-        result = self._records.copy()
+    def select_all(self):
+        return list(self._records.values())
 
-        if filters:
-            for column, value in filters.items():
-                if column not in self.columns:
-                    raise UnknownColumnError(f"Неизвестная колонка: {column}")
-                index = self.columns.index(column)
-                result = [r for r in result if r[index] == value]
-
-        if order_by:
-            if order_by not in self.columns:
-                raise UnknownColumnError(f"Неизвестная колонка: {order_by}")
-            index = self.columns.index(order_by)
-            if order_by in self._indexes and not filters:
-                index_data = self._indexes[order_by]
-                if value in index_data:
-                    result = [r for r in result if r in index_data[value]]
-            else:
-                result = sorted(result, key=lambda x: x[index], reverse=reverse)
-
+    def select_by_filter(self, field_name, value):
+        if field_name not in self.columns and field_name != "id":
+            raise ValueError(f"Поле '{field_name}' не найдено")
+        result = []
+        for record in self._records.values():
+            if str(record.get(field_name)) == str(value):
+                result.append(record)
         return result
 
-    def create_index(self, column: str) -> None:
-        if column not in self.columns:
-            raise UnknownColumnError(f"Неизвестная колонка: {column}")
-        index = self.columns.index(column)
-        self._indexes[column] = {}
-        for record in self._records:
-            value = record[index]
-            if value not in self._indexes[column]:
-                self._indexes[column][value] = []
-            self._indexes[column][value].append(record)
+    def update_record(self, record_id, new_data):
+        if record_id not in self._records:
+            raise RecordNotFoundError(f"Запись с ID {record_id} не найдена")
+        if "age" in new_data and new_data["age"] < 0:
+            raise InvalidAgeError("Возраст не может быть отрицательным")
+        for k, v in new_data.items():
+            if k in self.columns or k == "id":
+                self._records[record_id][k] = v
+        return True
 
-    def update_index(self, column: str, record: Record, operation: str) -> None:
-        if column not in self._indexes:
-            return
-        index = self.columns.index(column)
-        value = record[index]
-        if operation == "add":
-            if value not in self._indexes[column]:
-                self._indexes[column][value] = []
-            self._indexes[column][value].append(record)
-        elif operation == "remove":
-            if value in self._indexes[column]:
-                if record in self._indexes[column][value]:
-                    self._indexes[column][value].remove(record)
-                if not self._indexes[column][value]:
-                    del self._indexes[column][value]
+    def delete_record(self, record_id):
+        if record_id not in self._records:
+            raise RecordNotFoundError(f"Запись с ID {record_id} не найдена")
+        del self._records[record_id]
+        return True
 
-    def clear(self) -> None:
-        self._records.clear()
-        for index in self._indexes:
-            self._indexes[index].clear()
+    def sort_records(self, field_name, ascending=True):
+        if field_name not in self.columns and field_name != "id":
+            raise ValueError(f"Поле '{field_name}' не найдено")
+        records = list(self._records.values())
+        records.sort(key=lambda x: x.get(field_name, ""), reverse=not ascending)
+        return records
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "columns": self.columns,
+            "next_id": self._next_id,
+            "records": self._records
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        table = cls(data["name"], data["columns"])
+        table._records = data["records"]
+        table._next_id = data["next_id"]
+        return table

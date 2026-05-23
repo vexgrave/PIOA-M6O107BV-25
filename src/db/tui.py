@@ -1,162 +1,216 @@
 from .backend.memory import MemoryDatabase
 from .backend.file import FileDatabase
-from .backend.file_csv import CsvDatabase
-from .backend.errors import DatabaseError, InvalidAgeError, DuplicateIDError
 
-class TUI:
-    def __init__(self, db_type: str = "memory", data_dir: str = "data"):
-        if db_type == "memory":
-            self.db = MemoryDatabase()
-        elif db_type == "file":
+class DatabaseTUI:
+    def __init__(self, storage_type="memory", data_dir="data"):
+        if storage_type == "file":
             self.db = FileDatabase(data_dir)
-        elif db_type == "csv":
-            self.db = CsvDatabase(data_dir)
         else:
             self.db = MemoryDatabase()
-        self.current_table = None
+        self.storage_type = storage_type
+
+    def print_records(self, records):
+        if not records:
+            print("Записей не найдено.")
+            return
+        headers = list(records[0].keys())
+        header_line = "".join(f"{h:<15}" for h in headers)
+        print(f"\n{header_line}")
+        print("-" * len(header_line))
+        for rec in records:
+            line = "".join(f"{str(rec.get(h, '')):<15}" for h in headers)
+            print(line)
 
     def run(self):
-        print("Добро пожаловать в СУБД")
+        print(f"Система управления данными ({self.storage_type})")
         while True:
-            print("\nГлавное меню:")
+            print("\n[MENU]")
             print("1. Создать таблицу")
-            print("2. Выбрать таблицу")
-            print("3. Добавить запись")
-            print("4. Поиск записей")
-            print("5. Сортировать записи")
-            print("6. Создать индекс")
-            print("7. Сохранить данные")
-            print("8. Загрузить данные")
-            print("9. Выход")
-            choice = input("Выберите действие: ").strip()
-            if choice == "1":
-                self._create_table()
-            elif choice == "2":
-                self._select_table()
-            elif choice == "3":
-                self._add_record()
-            elif choice == "4":
-                self._search_records()
-            elif choice == "5":
-                self._sort_records()
-            elif choice == "6":
-                self._create_index()
-            elif choice == "7":
-                self.db.save()
-                print("Данные сохранены")
-            elif choice == "8":
-                self.db.load()
-                print("Данные загружены")
-            elif choice == "9":
-                break
-            else:
-                print("Неверный выбор")
-
-    def _create_table(self):
-        name = input("Имя таблицы: ").strip()
-        columns_input = input("Колонки (через запятую): ").strip()
-        columns = [c.strip() for c in columns_input.split(",") if c.strip()]
-        try:
-            self.db.create_table(name, columns)
-            print(f"Таблица '{name}' создана")
-        except DatabaseError as e:
-            print(f"Ошибка: {e}")
-
-    def _select_table(self):
-        name = input("Имя таблицы: ").strip()
-        table = self.db.get_table(name)
-        if table:
-            self.current_table = name
-            print(f"Выбрана таблица '{name}'")
-        else:
-            print(f"Таблица '{name}' не найдена")
-
-    def _add_record(self):
-        if not self.current_table:
-            print("Сначала выберите таблицу")
-            return
-        table = self.db.get_table(self.current_table)
-        if not table:
-            print("Таблица не найдена")
-            return
-        print(f"Введите значения для колонок: {', '.join(table.columns)}")
-        values = []
-        for col in table.columns:
-            val = input(f"{col}: ").strip()
-            if col in ["student_id", "age"]:
-                try:
-                    values.append(int(val))
-                except ValueError:
-                    values.append(val)
-            else:
-                values.append(val)
-        try:
-            self.db.insert_record(self.current_table, tuple(values))
-            print("Запись добавлена")
-        except InvalidAgeError as e:
-            print(f"Ошибка: {e}")
-        except DuplicateIDError as e:
-            print(f"Ошибка: {e}")
-        except DatabaseError as e:
-            print(f"Ошибка: {e}")
-
-    def _search_records(self):
-        if not self.current_table:
-            print("Сначала выберите таблицу")
-            return
-        print("Фильтры (оставьте пустым для пропуска):")
-        table = self.db.get_table(self.current_table)
-        if not table:
-            return
-        filters = {}
-        for col in table.columns:
-            val = input(f"{col}: ").strip()
-            if val:
-                if col in ["student_id", "age"]:
-                    try:
-                        filters[col] = int(val)
-                    except ValueError:
-                        filters[col] = val
+            print("2. Добавить запись")
+            print("3. Показать все записи")
+            print("4. Найти запись по ID")
+            print("5. Найти по фильтру")
+            print("6. Обновить запись")
+            print("7. Удалить запись")
+            print("8. Сортировать записи")
+            print("9. Сохранить данные")
+            print("10. Выход")
+            choice = input("Введите действие: ").strip()
+            try:
+                if choice == "1":
+                    self.create_table_menu()
+                elif choice == "2":
+                    self.add_record_menu()
+                elif choice == "3":
+                    self.show_all_menu()
+                elif choice == "4":
+                    self.find_by_id_menu()
+                elif choice == "5":
+                    self.find_by_filter_menu()
+                elif choice == "6":
+                    self.update_record_menu()
+                elif choice == "7":
+                    self.delete_record_menu()
+                elif choice == "8":
+                    self.sort_records_menu()
+                elif choice == "9":
+                    self.db.save()
+                    print("Данные сохранены.")
+                elif choice == "10":
+                    if self.storage_type == "file":
+                        self.db.save()
+                    print("Выход из программы...")
+                    break
                 else:
-                    filters[col] = val
+                    print("Неверный пункт меню.")
+            except Exception as e:
+                print(f"Ошибка: {e}")
+
+    def create_table_menu(self):
+        name = input("Название таблицы: ").strip()
+        cols_str = input("Поля через запятую: ").strip()
+        cols = [c.strip() for c in cols_str.split(",") if c.strip()]
+        if not cols:
+            print("Ошибка: введите хотя бы одно поле.")
+            return
+        self.db.create_table(name, cols)
+        print(f"Таблица '{name}' создана.")
+
+    def add_record_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
+            return
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        data = {}
+        print(f"Введите данные для: {table.columns}")
+        for col in table.columns:
+            val = input(f"  {col}: ").strip()
+            try:
+                val = int(val)
+            except ValueError:
+                try:
+                    val = float(val)
+                except ValueError:
+                    pass
+            data[col] = val
+        record_id = table.create_record(data)
+        print(f"Запись добавлена. ID: {record_id}")
+
+    def show_all_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
+            return
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        records = table.select_all()
+        self.print_records(records)
+
+    def find_by_id_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
+            return
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
         try:
-            results = self.db.select_records(self.current_table, filters)
-            if results:
-                print(f"\nНайдено записей: {len(results)}")
-                for rec in results:
-                    print(rec)
-            else:
-                print("Записи не найдены")
-        except DatabaseError as e:
+            record_id = int(input("ID записи: ").strip())
+        except ValueError:
+            print("Ошибка: ID должен быть числом.")
+            return
+        try:
+            record = table.select_record(record_id)
+            self.print_records([record])
+        except Exception as e:
             print(f"Ошибка: {e}")
 
-    def _sort_records(self):
-        if not self.current_table:
-            print("Сначала выберите таблицу")
+    def find_by_filter_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
             return
-        table = self.db.get_table(self.current_table)
-        if not table:
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        field = input("Поле для фильтра: ").strip()
+        value = input("Значение: ").strip()
+        try:
+            results = table.select_by_filter(field, value)
+            self.print_records(results)
+        except Exception as e:
+            print(f"Ошибка: {e}")
+
+    def update_record_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
             return
-        field = input(f"Поле для сортировки ({', '.join(table.columns)}): ").strip()
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        try:
+            record_id = int(input("ID записи: ").strip())
+        except ValueError:
+            print("Ошибка: ID должен быть числом.")
+            return
+        new_data = {}
+        for col in table.columns:
+            val = input(f"Новое {col} (Enter - пропуск): ").strip()
+            if val:
+                try:
+                    val = int(val)
+                except ValueError:
+                    try:
+                        val = float(val)
+                    except ValueError:
+                        pass
+                new_data[col] = val
+        if not new_data:
+            print("Нет данных для обновления.")
+            return
+        try:
+            table.update_record(record_id, new_data)
+            print("Запись обновлена.")
+        except Exception as e:
+            print(f"Ошибка: {e}")
+
+    def delete_record_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
+            return
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        try:
+            record_id = int(input("ID записи: ").strip())
+        except ValueError:
+            print("Ошибка: ID должен быть числом.")
+            return
+        try:
+            table.delete_record(record_id)
+            print("Запись удалена.")
+        except Exception as e:
+            print(f"Ошибка: {e}")
+
+    def sort_records_menu(self):
+        tables = self.db.list_tables()
+        if not tables:
+            print("Нет доступных таблиц.")
+            return
+        print(f"Таблицы: {tables}")
+        tbl_name = input("Выберите таблицу: ").strip()
+        table = self.db.get_table(tbl_name)
+        field = input("Поле для сортировки: ").strip()
         order = input("Порядок (asc/desc): ").strip().lower()
-        reverse = order == "desc"
+        ascending = order != "desc"
         try:
-            results = self.db.select_records(self.current_table, order_by=field, reverse=reverse)
-            for rec in results:
-                print(rec)
-        except DatabaseError as e:
-            print(f"Ошибка: {e}")
-
-    def _create_index(self):
-        if not self.current_table:
-            print("Сначала выберите таблицу")
-            return
-        table = self.db.get_table(self.current_table)
-        if not table:
-            return
-        field = input(f"Поле для индекса ({', '.join(table.columns)}): ").strip()
-        try:
-            table.create_index(field)
-            print(f"Индекс создан для поля '{field}'")
-        except DatabaseError as e:
+            sorted_records = table.sort_records(field, ascending)
+            self.print_records(sorted_records)
+        except Exception as e:
             print(f"Ошибка: {e}")
