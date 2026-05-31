@@ -59,7 +59,7 @@ class DatabaseTUI:
     def add_record_menu(self):
         tables = self.db.list_tables()
         if not tables:
-            print("Нет доступных таблиц. Создайте таблицу сначала.")
+            print("Нет доступных таблиц.")
             return
         print(f"Доступные таблицы: {tables}")
         tbl_name = input("Введите название таблицы: ").strip()
