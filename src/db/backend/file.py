@@ -1,6 +1,5 @@
 import json
 import csv
-import os
 from pathlib import Path
 from .database import Database
 from .table import Table
@@ -31,8 +30,11 @@ class JSONDatabase(Database):
     def save(self):
         for table_name, table in self.tables.items():
             file_path = self.data_dir / f"{table_name}.json"
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(table.to_dict(), f, ensure_ascii=False, indent=2)
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(table.to_dict(), f, ensure_ascii=False, indent=2)
+            except IOError as e:
+                raise FileDatabaseError(f"Ошибка записи файла {file_path}: {e}")
 
     def load(self):
         self.tables = {}
@@ -52,6 +54,8 @@ class JSONDatabase(Database):
                 raise FileDatabaseError(f"Ошибка парсинга JSON в файле {file_path}: {e}")
             except (KeyError, TypeError) as e:
                 raise FileDatabaseError(f"Ошибка в структуре файла {file_path}: {e}")
+            except IOError as e:
+                raise FileDatabaseError(f"Ошибка чтения файла {file_path}: {e}")
 
     def close(self):
         self.save()
@@ -108,38 +112,46 @@ class CSVDatabase(Database):
             raise FileDatabaseError(f"Ошибка парсинга метаданных: {e}")
         except (KeyError, TypeError) as e:
             raise FileDatabaseError(f"Ошибка в метаданных: {e}")
+        except IOError as e:
+            raise FileDatabaseError(f"Ошибка чтения метаданных: {e}")
 
     def _save_table(self, table_name):
         table = self.tables[table_name]
         csv_file = self.data_dir / f"{table_name}.csv"
         
-        with open(csv_file, "w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["id"] + table.columns)
-            writer.writeheader()
-            for row in table.rows:
-                writer.writerow(row)
+        try:
+            with open(csv_file, "w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["id"] + table.columns)
+                writer.writeheader()
+                for row in table.rows:
+                    writer.writerow(row)
+        except IOError as e:
+            raise FileDatabaseError(f"Ошибка записи файла {csv_file}: {e}")
 
     def _load_table(self, table_name):
         table = self.tables[table_name]
         csv_file = self.data_dir / f"{table_name}.csv"
         
         if csv_file.exists():
-            with open(csv_file, "r", encoding="utf-8", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    parsed_row = {}
-                    for key, value in row.items():
-                        if key == "id":
-                            parsed_row[key] = int(value)
-                        else:
-                            try:
+            try:
+                with open(csv_file, "r", encoding="utf-8", newline="") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        parsed_row = {}
+                        for key, value in row.items():
+                            if key == "id":
                                 parsed_row[key] = int(value)
-                            except ValueError:
+                            else:
                                 try:
-                                    parsed_row[key] = float(value)
+                                    parsed_row[key] = int(value)
                                 except ValueError:
-                                    parsed_row[key] = value
-                    table.rows.append(parsed_row)
+                                    try:
+                                        parsed_row[key] = float(value)
+                                    except ValueError:
+                                        parsed_row[key] = value
+                        table.rows.append(parsed_row)
+            except IOError as e:
+                raise FileDatabaseError(f"Ошибка чтения файла {csv_file}: {e}")
 
     def _save_metadata(self):
         metadata = {}
@@ -150,8 +162,11 @@ class CSVDatabase(Database):
                 "indexes": table.indexes
             }
         
-        with open(self.meta_file, "w", encoding="utf-8") as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
+        try:
+            with open(self.meta_file, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, ensure_ascii=False, indent=2)
+        except IOError as e:
+            raise FileDatabaseError(f"Ошибка записи метаданных: {e}")
 
     def close(self):
         self.save()

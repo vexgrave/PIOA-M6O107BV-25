@@ -27,24 +27,39 @@ class Table:
             if key not in self.columns and key != "id":
                 raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
         
+        if not filters:
+            return self.rows[:]
+        
+        candidates = None
+        
         if self.indexes:
             for key, value in filters.items():
                 if key in self.indexes:
                     index = self.indexes[key]
-                    if str(value) in index:
-                        ids = index[str(value)]
-                        return [row for row in self.rows if row["id"] in ids]
+                    str_value = str(value)
+                    if str_value in index:
+                        row_ids = set(index[str_value])
+                        if candidates is None:
+                            candidates = row_ids
+                        else:
+                            candidates = candidates.intersection(row_ids)
         
-        result = []
-        for row in self.rows:
+        if candidates is not None:
+            result = [row for row in self.rows if row["id"] in candidates]
+        else:
+            result = self.rows[:]
+        
+        final_result = []
+        for row in result:
             match = True
             for key, value in filters.items():
                 if str(row.get(key)) != str(value):
                     match = False
                     break
             if match:
-                result.append(row)
-        return result
+                final_result.append(row)
+        
+        return final_result
 
     def update(self, row_id, new_data):
         for key in new_data.keys():
