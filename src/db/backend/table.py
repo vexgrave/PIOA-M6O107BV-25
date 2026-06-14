@@ -27,39 +27,39 @@ class Table:
             if key not in self.columns and key != "id":
                 raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
         
-        if not filters:
-            return self.rows[:]
-        
         candidates = None
         
+       
         if self.indexes:
             for key, value in filters.items():
                 if key in self.indexes:
-                    index = self.indexes[key]
-                    str_value = str(value)
-                    if str_value in index:
-                        row_ids = set(index[str_value])
+                    index_map = self.indexes[key]
+                    str_val = str(value)
+                    if str_val in index_map:
+                        current_ids = set(index_map[str_val])
                         if candidates is None:
-                            candidates = row_ids
+                            candidates = current_ids
                         else:
-                            candidates = candidates.intersection(row_ids)
+                          
+                            candidates.intersection_update(current_ids)
+                    else:
+                        return []
         
-        if candidates is not None:
-            result = [row for row in self.rows if row["id"] in candidates]
+        if candidates is None:
+            rows_to_check = self.rows
         else:
-            result = self.rows[:]
-        
-        final_result = []
-        for row in result:
+            rows_to_check = [row for row in self.rows if row["id"] in candidates]
+
+        result = []
+        for row in rows_to_check:
             match = True
             for key, value in filters.items():
                 if str(row.get(key)) != str(value):
                     match = False
                     break
             if match:
-                final_result.append(row)
-        
-        return final_result
+                result.append(row)
+        return result
 
     def update(self, row_id, new_data):
         for key in new_data.keys():
