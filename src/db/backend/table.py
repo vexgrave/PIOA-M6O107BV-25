@@ -23,19 +23,22 @@ class Table:
         if filters is None:
             return self.rows[:]
         
-        if filters and self.indexes:
+        for key in filters.keys():
+            if key not in self.columns and key != "id":
+                raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
+        
+        if self.indexes:
             for key, value in filters.items():
                 if key in self.indexes:
                     index = self.indexes[key]
                     if str(value) in index:
-                        return [self.rows[i] for i in index[str(value)]]
+                        ids = index[str(value)]
+                        return [row for row in self.rows if row["id"] in ids]
         
         result = []
         for row in self.rows:
             match = True
             for key, value in filters.items():
-                if key not in self.columns and key != "id":
-                    raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
                 if str(row.get(key)) != str(value):
                     match = False
                     break
@@ -44,6 +47,10 @@ class Table:
         return result
 
     def update(self, row_id, new_data):
+        for key in new_data.keys():
+            if key not in self.columns and key != "id":
+                raise FieldNotFoundError(f"Поле '{key}' не найдено в таблице")
+        
         for row in self.rows:
             if row["id"] == row_id:
                 old_data = row.copy()
@@ -77,11 +84,11 @@ class Table:
             raise FieldNotFoundError(f"Поле '{field}' не найдено в таблице")
         
         self.indexes[field] = {}
-        for i, row in enumerate(self.rows):
+        for row in self.rows:
             value = str(row.get(field, ""))
             if value not in self.indexes[field]:
                 self.indexes[field][value] = []
-            self.indexes[field][value].append(i)
+            self.indexes[field][value].append(row["id"])
 
     def drop_index(self, field):
         if field in self.indexes:
@@ -91,19 +98,15 @@ class Table:
         for field, index in self.indexes.items():
             if field in data:
                 value = str(data[field])
+                record_id = data["id"]
                 if operation == "add":
                     if value not in index:
                         index[value] = []
-                    index[value].append(len(self.rows) - 1)
+                    index[value].append(record_id)
                 elif operation == "delete":
                     if value in index:
-                        idx_to_remove = None
-                        for i, row_idx in enumerate(index[value]):
-                            if self.rows[row_idx]["id"] == data["id"]:
-                                idx_to_remove = i
-                                break
-                        if idx_to_remove is not None:
-                            index[value].pop(idx_to_remove)
+                        if record_id in index[value]:
+                            index[value].remove(record_id)
                         if not index[value]:
                             del index[value]
 
@@ -112,21 +115,18 @@ class Table:
             if field in old_data and field in new_data:
                 old_value = str(old_data[field])
                 new_value = str(new_data[field])
+                record_id = new_data["id"]
                 
                 if old_value != new_value:
                     if old_value in self.indexes[field]:
-                        for i, row_idx in enumerate(self.indexes[field][old_value]):
-                            if self.rows[row_idx]["id"] == new_data["id"]:
-                                self.indexes[field][old_value].pop(i)
-                                break
+                        if record_id in self.indexes[field][old_value]:
+                            self.indexes[field][old_value].remove(record_id)
                         if not self.indexes[field][old_value]:
                             del self.indexes[field][old_value]
                     
                     if new_value not in self.indexes[field]:
                         self.indexes[field][new_value] = []
-                    self.indexes[field][new_value].append(
-                        next(i for i, row in enumerate(self.rows) if row["id"] == new_data["id"])
-                    )
+                    self.indexes[field][new_value].append(record_id)
 
     def to_dict(self):
         return {

@@ -374,8 +374,8 @@ class TestFileDatabaseEdgeCases(unittest.TestCase):
         with open(meta_file, "w") as f:
             f.write("{ invalid json")
         
-        db = CSVDatabase(self.test_dir_csv)
-        self.assertEqual(len(db.list_tables()), 0)
+        with self.assertRaises(FileDatabaseError):
+            CSVDatabase(self.test_dir_csv)
         
         shutil.rmtree(self.test_dir_csv)
 

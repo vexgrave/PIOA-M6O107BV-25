@@ -35,7 +35,12 @@ class TestTable(unittest.TestCase):
         result = self.table.read({"age": "20"})
         self.assertEqual(len(result), 1)
 
-    def test_read_invalid_field(self):
+    def test_read_invalid_field_on_empty_table(self):
+        with self.assertRaises(FieldNotFoundError):
+            self.table.read({"invalid_field": "value"})
+
+    def test_read_invalid_field_on_non_empty_table(self):
+        self.table.add({"name": "Anna", "age": 20})
         with self.assertRaises(FieldNotFoundError):
             self.table.read({"invalid_field": "value"})
 
@@ -57,6 +62,11 @@ class TestTable(unittest.TestCase):
     def test_update_nonexistent(self):
         result = self.table.update(999, {"name": "Test"})
         self.assertFalse(result)
+
+    def test_update_invalid_field(self):
+        record_id = self.table.add({"name": "Anna", "age": 20})
+        with self.assertRaises(FieldNotFoundError):
+            self.table.update(record_id, {"invalid_field": "value"})
 
     def test_delete_existing(self):
         record_id = self.table.add({"name": "Anna", "age": 20})

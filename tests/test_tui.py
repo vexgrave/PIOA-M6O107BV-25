@@ -38,7 +38,7 @@ class TestDatabaseTUI(unittest.TestCase):
     def test_add_record_menu_no_tables(self):
         with patch('sys.stdout', new_callable=io.StringIO) as mock_out:
             self.tui.add_record_menu()
-            self.assertIn('Создайте таблицу сначала', mock_out.getvalue())
+            self.assertIn('Нет доступных таблиц', mock_out.getvalue())
 
     def test_read_records_menu_all(self):
         self.tui.db.create_table('users', ['name'])

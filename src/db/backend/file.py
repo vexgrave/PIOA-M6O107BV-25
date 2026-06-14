@@ -42,18 +42,16 @@ class JSONDatabase(Database):
         for file_path in self.data_dir.glob("*.json"):
             try:
                 if file_path.stat().st_size == 0:
-                    continue
+                    raise FileDatabaseError(f"Пустой файл: {file_path}")
                     
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     table = Table.from_dict(data)
                     self.tables[table.name] = table
-            except json.JSONDecodeError:
-                print(f"Предупреждение: пропущен повреждённый файл {file_path}")
-                continue
+            except json.JSONDecodeError as e:
+                raise FileDatabaseError(f"Ошибка парсинга JSON в файле {file_path}: {e}")
             except (KeyError, TypeError) as e:
-                print(f"Предупреждение: ошибка в структуре файла {file_path}: {e}")
-                continue
+                raise FileDatabaseError(f"Ошибка в структуре файла {file_path}: {e}")
 
     def close(self):
         self.save()
@@ -103,12 +101,13 @@ class CSVDatabase(Database):
                 table.next_id = table_meta["next_id"]
                 self.tables[table_name] = table
                 self._load_table(table_name)
-        except json.JSONDecodeError:
-            print("Предупреждение: файл метаданных повреждён, начинаем с нуля")
-            self.tables = {}
+                
+                if "indexes" in table_meta:
+                    table.indexes = table_meta["indexes"]
+        except json.JSONDecodeError as e:
+            raise FileDatabaseError(f"Ошибка парсинга метаданных: {e}")
         except (KeyError, TypeError) as e:
-            print(f"Предупреждение: ошибка в метаданных: {e}")
-            self.tables = {}
+            raise FileDatabaseError(f"Ошибка в метаданных: {e}")
 
     def _save_table(self, table_name):
         table = self.tables[table_name]
@@ -147,7 +146,8 @@ class CSVDatabase(Database):
         for table_name, table in self.tables.items():
             metadata[table_name] = {
                 "columns": table.columns,
-                "next_id": table.next_id
+                "next_id": table.next_id,
+                "indexes": table.indexes
             }
         
         with open(self.meta_file, "w", encoding="utf-8") as f:

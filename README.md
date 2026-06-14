@@ -10,26 +10,30 @@
 Расширение системы управления данными с поддержкой файлового хранилища. Данные сохраняются на диск в формате JSON и загружаются при запуске программы.
 
 ## Структура проекта
+```
 PIOA-M6O-107BV-25/
+├── data/                  
 ├── src/
-│ └── db/
-│ ├── backend/
-│ │ ├── init.py
-│ │ ├── database.py
-│ │ ├── errors.py
-│ │ ├── file.py
-│ │ ├── memory.py
-│ │ └── table.py
-│ ├── init.py
-│ ├── main.py
-│ └── tui.py
-├── data/
+│   └── db/
+│       ├── __init__.py
+│       ├── __main__.py    
+│       ├── tui.py         
+│       └── backend/       
+│           ├── __init__.py
+│           ├── database.py 
+│           ├── errors.py   
+│           ├── file.py     
+│           ├── memory.py   
+│           └── table.py    
 ├── tests/
-│ ├── init.py
-│ ├── test_file_database.py
-│ └── test_memory.py
+│   ├── __init__.py
+│   ├── test_errors.py
+│   ├── test_file_database.py
+│   ├── test_memory.py
+│   └── test_tui.py
+├── .gitignore
 └── README.md
-
+```
 ## Функциональность
 
 # Базовая функциональность
@@ -76,6 +80,5 @@ python -m src.db json - Файловая JSON
 python -m src.db csv - Файловая CSV
 
 # Запуск тестов
-python -m coverage run -m unittest discover -s tests
-python -m coverage report - Процент покрытмя
+python -m pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80 -v
 
