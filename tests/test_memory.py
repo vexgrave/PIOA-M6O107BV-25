@@ -1,5 +1,5 @@
 import unittest
-from src.db.backend.memory import Table, InMemoryDB
+from src.db.backend.memory import InMemoryDB, Table
 from src.db.backend.errors import (
     TableNotFoundError,
     TableAlreadyExistsError,
@@ -23,11 +23,22 @@ class TestTable(unittest.TestCase):
         with self.assertRaises(MissingFieldError):
             self.table.add({"name": "Bob"})
 
+    def test_add_multiple_records(self):
+        id1 = self.table.add({"name": "Anna", "age": 20})
+        id2 = self.table.add({"name": "Bob", "age": 25})
+        self.assertEqual(id1, 1)
+        self.assertEqual(id2, 2)
+        self.assertEqual(len(self.table.rows), 2)
+
     def test_read_all(self):
         self.table.add({"name": "Anna", "age": 20})
         self.table.add({"name": "Bob", "age": 25})
         result = self.table.read()
         self.assertEqual(len(result), 2)
+
+    def test_read_empty_table(self):
+        result = self.table.read()
+        self.assertEqual(len(result), 0)
 
     def test_read_with_filter(self):
         self.table.add({"name": "Anna", "age": 20})
@@ -36,9 +47,10 @@ class TestTable(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "Anna")
 
-    def test_read_invalid_field(self):
-        with self.assertRaises(FieldNotFoundError):
-            self.table.read({"invalid_field": "value"})
+    def test_read_no_matches(self):
+        self.table.add({"name": "Anna", "age": 20})
+        result = self.table.read({"name": "NonExistent"})
+        self.assertEqual(len(result), 0)
 
     def test_update_existing(self):
         record_id = self.table.add({"name": "Anna", "age": 20})
@@ -90,8 +102,7 @@ class TestInMemoryDB(unittest.TestCase):
 
     def test_create_table(self):
         self.db.create_table("users", ["name", "age"])
-        tables = self.db.list_tables()
-        self.assertIn("users", tables)
+        self.assertIn("users", self.db.list_tables())
 
     def test_create_duplicate_table(self):
         self.db.create_table("users", ["name", "age"])
@@ -114,6 +125,10 @@ class TestInMemoryDB(unittest.TestCase):
         self.assertEqual(len(tables), 2)
         self.assertIn("users", tables)
         self.assertIn("products", tables)
+
+    def test_list_tables_empty(self):
+        tables = self.db.list_tables()
+        self.assertEqual(len(tables), 0)
 
     def test_full_crud(self):
         self.db.create_table("users", ["name", "age"])

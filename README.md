@@ -4,26 +4,30 @@
 Группа: M6O-107BV-25
 Язык: Python
 
-# Лабораторная работа 3
+## Лабораторная работа 3
 
 # Описание
 Переработка системы управления данными студентов с использованием объектно-ориентированного программирования и автоматизированного тестирования.
 
 # Структура проекта
+```
+PIOA-M6O-107BV-25/
 ├── src/
 │ └── db/
 │ ├── backend/
-│ │ ├── init.py
-│ │ ├── errors.py # пользовательские исключения
-│ │ └── memory.py # класс StudentTable
-│ ├── init.py
-│ ├── main.py # точка входа
-│ └── tui.py # консольный интерфейс (класс)
+│ │ ├── __init__.py
+│ │ ├── errors.py 
+│ │ └── memory.py 
+│ ├── __init__.py
+│ ├── __main__.py 
+│ └── tui.py 
 ├── tests/
-│ ├── init.py
-│ └── test_memory.py # тесты для backend
-├── .gitignore
-└── README.md
+│ ├── __init__.py
+│ ├── test_memory.py 
+│ └── test_tui.py 
+├── .gitignore 
+└── README.md 
+```
 
 # Функциональность
 - Создание произвольного количества таблиц с заданными полями
@@ -41,10 +45,5 @@
 python -m src.db
 
 # Запуск тестов
-python -m unittest discover -s tests
-python -m unittest discover -s tests -v - с подробным выводом
-
-# Проверка процента покрытия
-python -m coverage run -m unittest discover -s tests
-python -m coverage report
+python -m pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=80 -v
 
